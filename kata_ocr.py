@@ -4,6 +4,7 @@ from PIL import Image
 import io
 import pandas as pd
 import json
+import re
 
 def get_gemini_model():
     """Streamlit Cloud の Secrets から Gemini API キーを取得してモデルを初期化"""
@@ -43,12 +44,22 @@ def extract_info_with_gemini(model, image_bytes):
     response = model.generate_content(
         [prompt, {"mime_type": "image/jpeg", "data": image_bytes}]
     )
+    response_text = response.text.strip() #前後の空白を削除
+
+    # ```json プレフィックスと ``` サフィックスを取り除く
+    response_text = re.sub(r'^```json', '', response_text) #先頭や末尾にある可能性のあるjsonを削除
+    response_text = re.sub(r'```$', '', response_text).strip() #前後の空白を削除
+
+    if not response_text:
+        st.error("Gemini API からの応答が空です。")
+        return None
+
     try:
         # Gemini の応答が JSON 形式であると期待して解析
-        extracted_data = json.loads(response.text)
+        extracted_data = json.loads(response_text)
         return extracted_data
     except Exception as e:
-        st.error(f"抽出結果の解析に失敗しました: {e}\n応答内容: {response.text}")
+        st.error(f"抽出結果の解析に失敗しました: {e}\n応答内容: {response_text}")
         return None
 
 def main():
